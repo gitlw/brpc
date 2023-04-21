@@ -15,8 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 2.8.10)
+cmake_minimum_required(VERSION 3.16)
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_SOURCE_DIR}/cmake")
+include(HunterGate)
+HunterGate(
+  URL "https://github.com/gitlw/hunter/archive/incubator-2023-04-21_01.zip"
+  SHA1 "4f9dea7831043fe383b1a2b00ebe7adabf569a45"
+  LOCAL
+)
+
 project(brpc C CXX)
+
 
 option(WITH_GLOG "With glog" OFF)
 option(WITH_MESALINK "With MesaLink" OFF)
@@ -77,9 +86,7 @@ endif()
 include(GNUInstallDirs)
 
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/src/butil/config.h @ONLY)
-
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-
+hunter_add_package(gflags)
 find_package(GFLAGS REQUIRED)
 
 execute_process(
@@ -150,9 +157,16 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     endif()
 endif()
 
+hunter_add_package(Protobuf)
 find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 
+hunter_add_package(crc32c)
+find_package(crc32c CONFIG REQUIRED)
+
+
+hunter_add_package(leveldb)
+find_package(leveldb CONFIG REQUIRED)
 find_path(LEVELDB_INCLUDE_PATH NAMES leveldb/db.h)
 find_library(LEVELDB_LIB NAMES leveldb)
 if ((NOT LEVELDB_INCLUDE_PATH) OR (NOT LEVELDB_LIB))
@@ -208,7 +222,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         )
 endif()
 
-find_package(OpenSSL)
+hunter_add_package(OpenSSL)
+find_package(OpenSSL REQUIRED)
 
 include_directories(
         ${GFLAGS_INCLUDE_PATH}
@@ -216,7 +231,8 @@ include_directories(
         ${LEVELDB_INCLUDE_PATH}
         ${OPENSSL_INCLUDE_DIR}
         )
-
+hunter_add_package(crc32c)
+find_package(crc32c CONFIG REQUIRED)
 set(DYNAMIC_LIB
     ${GFLAGS_LIBRARY}
     ${PROTOBUF_LIBRARIES}
@@ -225,14 +241,15 @@ set(DYNAMIC_LIB
     ${CMAKE_THREAD_LIBS_INIT}
     ${THRIFT_LIB}
     ${THRIFTNB_LIB}
-    ${OPENSSL_CRYPTO_LIBRARY}
     dl
-    z)
+    z
+    crc32c::crc32c)
 
 if(WITH_MESALINK)
-    list(APPEND DYNAMIC_LIB ${MESALINK_LIB})
+    list(APPEND DYNAMIC_LIB ${OPENSSL_CRYPTO_LIBRARY} ${MESALINK_LIB})
 else()
-    list(APPEND DYNAMIC_LIB ${OPENSSL_SSL_LIBRARY})
+    # the crypto library must appear after ssl library since the latter uses symbols in the former
+    list(APPEND DYNAMIC_LIB ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
 endif()
 
 if(WITH_RDMA)
